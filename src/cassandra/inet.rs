@@ -1,5 +1,5 @@
 use crate::cassandra::error::*;
-use crate::cassandra::util::Protected;
+use crate::cassandra::util::{Protected, ProtectedInner};
 use crate::cassandra_sys::cass_inet_from_string_n;
 use crate::cassandra_sys::cass_inet_init_v4;
 use crate::cassandra_sys::cass_inet_init_v6;
@@ -36,10 +36,13 @@ impl PartialEq for Inet {
     }
 }
 
-impl Protected<_Inet> for Inet {
+impl ProtectedInner<_Inet> for Inet {
     fn inner(&self) -> _Inet {
         self.0
     }
+}
+
+impl Protected<_Inet> for Inet {
     fn build(inner: _Inet) -> Self {
         Inet(inner)
     }
@@ -99,8 +102,8 @@ impl ToString for Inet {
     fn to_string(&self) -> String {
         unsafe {
             let mut inet_str = [0i8; cassandra_cpp_sys::CASS_INET_STRING_LENGTH as usize];
-            cass_inet_string(self.0, inet_str.as_mut_ptr());
-            CStr::from_ptr(inet_str.as_ptr())
+            cass_inet_string(self.0, inet_str.as_mut_ptr() as *mut libc::c_char );
+            CStr::from_ptr(inet_str.as_ptr()  as *const libc::c_char )
                 .to_string_lossy()
                 .into_owned()
         }

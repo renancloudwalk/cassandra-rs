@@ -4,12 +4,10 @@ use crate::cassandra::policy::retry::RetryPolicy;
 use crate::cassandra::session::Session;
 use crate::cassandra::ssl::Ssl;
 use crate::cassandra::time::TimestampGen;
-use crate::cassandra::util::Protected;
+use crate::cassandra::util::{Protected, ProtectedInner};
 
 use crate::cassandra_sys::cass_cluster_free;
 use crate::cassandra_sys::cass_cluster_new;
-use crate::cassandra_sys::cass_cluster_set_cloud_secure_connection_bundle_n;
-use crate::cassandra_sys::cass_cluster_set_cloud_secure_connection_bundle_no_ssl_lib_init_n;
 use crate::cassandra_sys::cass_cluster_set_connect_timeout;
 use crate::cassandra_sys::cass_cluster_set_connection_heartbeat_interval;
 use crate::cassandra_sys::cass_cluster_set_connection_idle_timeout;
@@ -48,6 +46,7 @@ use crate::cassandra_sys::cass_cluster_set_write_bytes_low_water_mark;
 use crate::cassandra_sys::cass_false;
 use crate::cassandra_sys::cass_future_error_code;
 use crate::cassandra_sys::cass_session_connect;
+use crate::cassandra_sys::cass_session_connect_keyspace_n;
 use crate::cassandra_sys::cass_session_new;
 use crate::cassandra_sys::cass_true;
 use crate::cassandra_sys::CassCluster as _Cluster;
@@ -62,7 +61,7 @@ use std::net::Ipv4Addr;
 use std::os::raw::c_char;
 use std::result;
 use std::str::FromStr;
-use std::time::Duration;
+use time::Duration;
 
 /// A CQL protocol version is just an integer.
 pub type CqlProtocol = i32;
@@ -74,10 +73,12 @@ pub type CqlProtocol = i32;
 ///
 /// # Examples
 /// ```
+/// # async fn test() {
 /// use cassandra_cpp::Cluster;
 /// let mut cluster = Cluster::default();
 /// cluster.set_contact_points("127.0.0.1").unwrap();
-/// let _session = cluster.connect().unwrap();
+/// let session = cluster.connect().await.unwrap();
+/// # }
 /// ```
 #[derive(Debug)]
 pub struct Cluster(pub *mut _Cluster);
@@ -93,10 +94,13 @@ impl Drop for Cluster {
     }
 }
 
-impl Protected<*mut _Cluster> for Cluster {
+impl ProtectedInner<*mut _Cluster> for Cluster {
     fn inner(&self) -> *mut _Cluster {
         self.0
     }
+}
+
+impl Protected<*mut _Cluster> for Cluster {
     fn build(inner: *mut _Cluster) -> Self {
         if inner.is_null() {
             panic!("Unexpected null pointer")
@@ -152,60 +156,37 @@ impl Cluster {
     }
 
     /// Sets the SSL context and enables SSL
-    pub fn set_ssl(&mut self, ssl: &mut Ssl) -> &Self {
+    pub fn set_ssl(&mut self, ssl: Ssl) -> &Self {
         unsafe {
             cass_cluster_set_ssl(self.0, ssl.inner());
             self
         }
     }
 
-    /// Sets the secure connection bundle path for processing DBaaS credentials.
-    pub fn set_cloud_secure_connection_bundle(&mut self, path: &str) -> Result<&mut Self> {
-        unsafe {
-            let path_ptr = path.as_ptr() as *const c_char;
-            let err =
-                cass_cluster_set_cloud_secure_connection_bundle_n(self.0, path_ptr, path.len());
-            err.to_result(self)
-        }
+    /// Connects to the cassandra cluster
+    pub async fn connect(&mut self) -> Result<Session> {
+        let session = Session::new();
+        let connect_future = {
+            let connect = unsafe { cass_session_connect(session.inner(), self.0) };
+            CassFuture::build(session, connect)
+        };
+        connect_future.await
     }
 
-    /// Sets the secure connection bundle path for processing DBaaS credentials, but it
-    /// does not initialize the underlying SSL library implementation. The SSL library still
-    /// needs to be initialized, but it's up to the client application to handle
-    /// initialization.
-    pub fn set_cloud_secure_connection_bundle_no_ssl_lib_init(
-        &mut self,
-        path: &str,
-    ) -> Result<&mut Self> {
-        unsafe {
-            let path_ptr = path.as_ptr() as *const c_char;
-            let err = cass_cluster_set_cloud_secure_connection_bundle_no_ssl_lib_init_n(
-                self.0,
-                path_ptr,
-                path.len(),
-            );
-            err.to_result(self)
-        }
-    }
-
-    /// Performs a blocking call to connect to Cassandra cluster
-    pub fn connect(&mut self) -> Result<Session> {
-        unsafe {
-            let session = Session(cass_session_new());
-            let connect_future = <CassFuture<()>>::build(cass_session_connect(session.0, self.0));
-            connect_future.wait()?;
-            Ok(session)
-        }
-    }
-
-    /// Asynchronously connects to the cassandra cluster
-    pub async fn connect_async(&mut self) -> Result<Session> {
-        unsafe {
-            let session = Session(cass_session_new());
-            let connect_future = <CassFuture<()>>::build(cass_session_connect(session.0, self.0));
-            connect_future.await?;
-            Ok(session)
-        }
+    /// Connects to the cassandra cluster, setting the keyspace of the session.
+    pub async fn connect_keyspace(&mut self, keyspace: &str) -> Result<Session> {
+        let session = Session::new();
+        let keyspace_ptr = keyspace.as_ptr() as *const c_char;
+        let connect_keyspace = unsafe {
+            cass_session_connect_keyspace_n(
+                session.inner(),
+                self.inner(),
+                keyspace_ptr,
+                keyspace.len(),
+            )
+        };
+        let connect_future = CassFuture::build(session, connect_keyspace);
+        connect_future.await
     }
 
     /// Sets the protocol version. This will automatically downgrade to the lowest
@@ -370,7 +351,7 @@ impl Cluster {
     /// Default: 5000ms
     pub fn set_connect_timeout(&mut self, timeout: Duration) -> &Self {
         unsafe {
-            cass_cluster_set_connect_timeout(self.0, timeout.as_millis() as u32);
+            cass_cluster_set_connect_timeout(self.0, timeout.whole_milliseconds() as u32);
         }
         self
     }
@@ -381,7 +362,7 @@ impl Cluster {
     /// Default: 12000ms
     pub fn set_request_timeout(&mut self, timeout: Duration) -> &Self {
         unsafe {
-            cass_cluster_set_request_timeout(self.0, timeout.as_millis() as u32);
+            cass_cluster_set_request_timeout(self.0, timeout.whole_milliseconds() as u32);
         }
         self
     }
@@ -534,9 +515,9 @@ impl Cluster {
             cass_cluster_set_latency_aware_routing_settings(
                 self.0,
                 exclusion_threshold,
-                scale.as_millis() as u64,
-                retry_period.as_millis() as u64,
-                update_rate.as_millis() as u64,
+                scale.whole_milliseconds() as u64,
+                retry_period.whole_milliseconds() as u64,
+                update_rate.whole_milliseconds() as u64,
                 min_measured,
             );
         }
@@ -556,7 +537,7 @@ impl Cluster {
     /// Examples: "127.0.0.1" "127.0.0.1,127.0.0.2", "server1.domain.com"
     pub fn set_whitelist_filtering(&mut self, hosts: Vec<String>) -> &Self {
         unsafe {
-            cass_cluster_set_whitelist_filtering(self.0, hosts.join(",").as_ptr() as *const c_char);
+            cass_cluster_set_whitelist_filtering(self.0, hosts.join(",").as_ptr() as *const i8);
         }
         self
     }
@@ -581,7 +562,7 @@ impl Cluster {
             cass_cluster_set_tcp_keepalive(
                 self.0,
                 if enable { cass_true } else { cass_false },
-                delay.as_secs() as u32,
+                delay.whole_seconds() as u32,
             );
         }
         self
@@ -608,7 +589,7 @@ impl Cluster {
     /// Default: 30 seconds
     pub fn set_connection_heartbeat_interval(&mut self, hearbeat: Duration) -> &mut Self {
         unsafe {
-            cass_cluster_set_connection_heartbeat_interval(self.0, hearbeat.as_secs() as u32);
+            cass_cluster_set_connection_heartbeat_interval(self.0, hearbeat.whole_seconds() as u32);
             self
         }
     }
@@ -620,7 +601,7 @@ impl Cluster {
     /// Default: 60 seconds
     pub fn set_connection_idle_timeout(&mut self, timeout: Duration) -> &mut Self {
         unsafe {
-            cass_cluster_set_connection_idle_timeout(self.0, timeout.as_secs() as u32);
+            cass_cluster_set_connection_idle_timeout(self.0, timeout.whole_seconds() as u32);
             self
         }
     }
