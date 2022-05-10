@@ -8,22 +8,22 @@ use std::thread;
 
 use std::sync::mpsc::channel;
 
-/// find or initialize several clusters/sessions inside an Arc semaphore
+/// find or initialize several clusters/sessions inside an Arc mutex
 /// should not be confunded with max connections, this is much more related to simultaneous shared sessions
 /// e.g you can have 2 cluster sessions each with 10 connections running 1000+ queries
 /// this struct simplifies the need to create and handle multiple sessions
-pub struct ClusterSemaphore {
+pub struct ClusterMutex {
     mutex_cluster: Arc<Vec<Mutex<Cluster>>>,
     max_concurrency: usize,
 }
 
-impl ClusterSemaphore {
+impl ClusterMutex {
     /// create several cluster sessions based on the number of concurrencies
     pub fn new(max_concurrency: usize, cluster: Cluster) -> Self {
         let clusters: Vec<Mutex<Cluster>> = vec![Mutex::new(cluster)];
         let mutex_cluster = Arc::new(clusters);
 
-        ClusterSemaphore {
+        ClusterMutex {
             mutex_cluster,
             max_concurrency
         }

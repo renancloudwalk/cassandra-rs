@@ -67,7 +67,7 @@ fn main() {
     cluster.set_contact_points(contact_points).unwrap();
     cluster.set_load_balance_round_robin();
 
-    let mut cluster_semaphore = ClusterSemaphore::new(10, cluster);
-    let session = cluster_semaphore.connect().unwrap();
+    let mut cluster_mutex = ClusterMutex::new(10, cluster);
+    let session = cluster_mutex.connect().unwrap();
     do_work(&session).unwrap();
 }
