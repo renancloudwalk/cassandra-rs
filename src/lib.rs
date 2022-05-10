@@ -16,6 +16,7 @@ use cassandra_cpp_sys as cassandra_sys;
 
 pub use crate::cassandra::batch::{Batch, BatchType};
 pub use crate::cassandra::cluster::{Cluster, CqlProtocol};
+pub use crate::cassandra::cluster_semaphore::{ClusterSemaphore};
 pub use crate::cassandra::collection::{CassCollection, List, Map, Set};
 pub use crate::cassandra::consistency::Consistency;
 pub use crate::cassandra::custom_payload::CustomPayload;
@@ -63,6 +64,7 @@ mod cassandra {
     pub mod util;
     pub mod batch;
     pub mod cluster;
+    pub mod cluster_semaphore;
     pub mod collection;
     pub mod consistency;
     pub mod custom_payload;
