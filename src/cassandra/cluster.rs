@@ -414,6 +414,37 @@ impl Cluster {
         self
     }
 
+    /// Configures the cluster to use a reconnection policy that waits
+    /// exponentially longer between each reconnection attempt; however
+    /// will maintain a constant delay once the maximum delay is reached.
+    ///
+    /// This is the default reconnection policy.
+    ///
+    ///
+    /// Default:
+    /// - base_delay_ms: 2000ms
+    /// - max_delay_ms: 600000ms (10 minutes)
+    ///
+    /// <b>Note:</b> A random amount of jitter (+/- 15%) will be added to the pure
+    /// exponential delay value. This helps to prevent situations where multiple
+    /// connections are in the reconnection process at exactly the same time. The
+    /// jitter will never cause the delay to be less than the base delay, or more
+    /// than the max delay.
+    pub fn set_exponential_reconnect(
+        &mut self,
+        base_delay_ms: Duration,
+        max_delay_ms: Duration,
+    ) -> &Self {
+        unsafe {
+            cass_cluster_set_exponential_reconnect(
+                self.0,
+                base_delay_ms.as_millis() as u64,
+                max_delay_ms.as_millis() as u64,
+            );
+        }
+        self
+    }
+
     /// Sets credentials for plain text authentication.
     pub fn set_credentials(&mut self, username: &str, password: &str) -> Result<&mut Self> {
         unsafe {
