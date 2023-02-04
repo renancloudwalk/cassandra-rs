@@ -36,8 +36,8 @@ impl Drain for MyDrain {
 }
 
 #[cfg(feature = "slog")]
-#[test]
-fn test_slog_logger() {
+#[tokio::test]
+async fn test_slog_logger() {
     let drain = MyDrain::default();
     let logger = Logger::root(drain.clone().fuse(), o!());
 
@@ -85,9 +85,8 @@ fn test_log_logger() {
     );
     assert_eq!(record.key_values(), vec!());
 }
-
-#[test]
-fn test_metrics() {
+#[tokio::test]
+async fn test_metrics() {
     // This is just a check that metrics work and actually notice requests.
     // Need to send a cassandra query that will produce a positive number for the min_us metric
     // (minimum time to respond to a request in microseconds), i.e. a request that make cassandra
