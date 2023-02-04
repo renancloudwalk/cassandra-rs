@@ -457,8 +457,9 @@ async fn test_rendering() -> Result<()> {
         .await?;
     println!("test_rendering: {}", result);
 
-    let row = result.iter().next().unwrap();
-    let compaction_col = row.get_column_by_name("compaction")?;
+    let mut row_iter = result.iter();
+    let row = row_iter.next().unwrap();
+    let compaction_col = row.get_column_by_name("compaction").unwrap();
 
     // Check rendering of a column
     let column_debug = format!("{:?}", compaction_col);
