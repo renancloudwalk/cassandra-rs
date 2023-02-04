@@ -474,7 +474,7 @@ impl Statement {
     /// Sets the statement's tracing flag.
     pub fn set_tracing(&mut self, value: bool) -> Result<&mut Self> {
         unsafe {
-            cass_statement_set_tracing(self.0, if value { cass_true } else { cass_false })
+            cass_statement_set_tracing(self.inner(), if value { cass_true } else { cass_false })
                 .to_result(self)
         }
     }
