@@ -59,8 +59,8 @@ async fn test_slog_logger() {
 }
 
 #[cfg(feature = "log")]
-#[test]
-fn test_log_logger() {
+#[tokio::test]
+async fn test_log_logger() {
     use log::Level;
 
     let mut logger = logtest::Logger::start();
@@ -71,7 +71,7 @@ fn test_log_logger() {
     cluster
         .set_contact_points("absolute-gibberish.invalid")
         .unwrap();
-    cluster.connect().expect_err("Should fail to connect");
+    cluster.connect().await.expect_err("Should fail to connect");
 
     let record = logger.pop().unwrap();
     assert_eq!(
