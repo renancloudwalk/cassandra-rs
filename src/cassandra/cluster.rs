@@ -207,13 +207,13 @@ impl Cluster {
     }
 
     /// Connects to the cassandra cluster
-    pub fn connect(&mut self) -> Result<Session> {
-        unsafe {
-            let session = Session::new();
-            let connect_future = <CassFuture<()>>::build(session.clone() , cass_session_connect(session.inner(), self.0));
-            connect_future.wait()?;
-            Ok(session)
-        }
+    pub async fn connect(&mut self) -> Result<Session> {
+        let session = Session::new();
+        let connect_future = {
+            let connect = unsafe { cass_session_connect(session.inner(), self.0) };
+            CassFuture::build(session, connect)
+        };
+        connect_future.await
     }
 
     /// Connects to the cassandra cluster, setting the keyspace of the session.
