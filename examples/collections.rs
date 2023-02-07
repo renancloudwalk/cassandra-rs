@@ -63,6 +63,6 @@ async fn main() -> Result<()> {
     cluster.set_contact_points("127.0.0.1").unwrap();
     cluster.set_load_balance_round_robin();
 
-    let session = cluster.connect()?;
+    let session = cluster.connect().await?;
     do_work(&session).await
 }
