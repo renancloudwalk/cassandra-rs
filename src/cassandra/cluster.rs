@@ -16,6 +16,7 @@ use crate::cassandra_sys::cass_cluster_set_connection_idle_timeout;
 use crate::cassandra_sys::cass_cluster_set_contact_points_n;
 use crate::cassandra_sys::cass_cluster_set_core_connections_per_host;
 use crate::cassandra_sys::cass_cluster_set_credentials_n;
+use crate::cassandra_sys::cass_cluster_set_exponential_reconnect;
 use crate::cassandra_sys::cass_cluster_set_latency_aware_routing;
 use crate::cassandra_sys::cass_cluster_set_latency_aware_routing_settings;
 use crate::cassandra_sys::cass_cluster_set_load_balance_dc_aware_n;
@@ -34,6 +35,7 @@ use crate::cassandra_sys::cass_cluster_set_queue_size_event;
 use crate::cassandra_sys::cass_cluster_set_queue_size_io;
 use crate::cassandra_sys::cass_cluster_set_reconnect_wait_time;
 use crate::cassandra_sys::cass_cluster_set_request_timeout;
+use crate::cassandra_sys::cass_cluster_set_resolve_timeout;
 use crate::cassandra_sys::cass_cluster_set_retry_policy;
 use crate::cassandra_sys::cass_cluster_set_ssl;
 use crate::cassandra_sys::cass_cluster_set_tcp_keepalive;
@@ -205,13 +207,13 @@ impl Cluster {
     }
 
     /// Connects to the cassandra cluster
-    pub fn connect(&mut self) -> Result<Session> {
-        unsafe {
-            let session = Session::new();
-            let connect_future = <CassFuture<()>>::build(session.clone() , cass_session_connect(session.inner(), self.0));
-            connect_future.wait()?;
-            Ok(session)
-        }
+    pub async fn connect(&mut self) -> Result<Session> {
+        let session = Session::new();
+        let connect_future = {
+            let connect = unsafe { cass_session_connect(session.inner(), self.0) };
+            CassFuture::build(session, connect)
+        };
+        connect_future.await
     }
 
     /// Connects to the cassandra cluster, setting the keyspace of the session.
@@ -404,6 +406,51 @@ impl Cluster {
     pub fn set_request_timeout(&mut self, timeout: Duration) -> &Self {
         unsafe {
             cass_cluster_set_request_timeout(self.0, timeout.as_millis() as u32);
+        }
+        self
+    }
+
+    /// Sets the timeout for resolving the host.
+    /// Note: the default timeout when doing dns resolution with resolv.conf (as is done here) is 5000ms.
+    /// When using the default cassandra-cpp-driver timeout (also 5000ms) then DNS resolution will fail
+    /// before attempting to query backup DNS servers.
+    ///
+    ///
+    /// Default: 5000ms
+    pub fn set_resolve_timeout(&mut self, timeout: Duration) -> &Self {
+        unsafe {
+            cass_cluster_set_resolve_timeout(self.0, timeout.as_millis() as u32);
+        }
+        self
+    }
+
+    /// Configures the cluster to use a reconnection policy that waits
+    /// exponentially longer between each reconnection attempt; however
+    /// will maintain a constant delay once the maximum delay is reached.
+    ///
+    /// This is the default reconnection policy.
+    ///
+    ///
+    /// Default:
+    /// - base_delay_ms: 2000ms
+    /// - max_delay_ms: 600000ms (10 minutes)
+    ///
+    /// <b>Note:</b> A random amount of jitter (+/- 15%) will be added to the pure
+    /// exponential delay value. This helps to prevent situations where multiple
+    /// connections are in the reconnection process at exactly the same time. The
+    /// jitter will never cause the delay to be less than the base delay, or more
+    /// than the max delay.
+    pub fn set_exponential_reconnect(
+        &mut self,
+        base_delay_ms: Duration,
+        max_delay_ms: Duration,
+    ) -> &Self {
+        unsafe {
+            cass_cluster_set_exponential_reconnect(
+                self.0,
+                base_delay_ms.as_millis() as u64,
+                max_delay_ms.as_millis() as u64,
+            );
         }
         self
     }
