@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/Metaswitch/cassandra-rs.svg?branch=master)](https://travis-ci.org/Metaswitch/cassandra-rs)
+[![Build Status](https://github.com/Metaswitch/cassandra-rs/actions/workflows/build.yml/badge.svg)](https://github.com/Metaswitch/cassandra-rs/actions)
 [![Current Version](https://img.shields.io/crates/v/cassandra-cpp.svg)](https://crates.io/crates/cassandra-cpp)
 [![License](https://img.shields.io/github/license/Metaswitch/cassandra-rs.svg)](#License)
 
@@ -16,13 +16,24 @@ It is a wrapper around the raw driver binding crate [cassandra-cpp-sys](https://
 
 ## Getting started
 
-For this crate to work, you must first have installed the datastax-cpp driver.
+### Local environment
+
+For this crate to work, you must first have installed a sufficiently-recent version of the datastax-cpp driver (at least 2.16).
 Follow the steps in the
 [cpp driver docs](https://github.com/datastax/cpp-driver/tree/master/topics#installation)
 to do so. Pre-built packages are available for most platforms.
 
 Make sure that the driver (specifically `libcassandra_static.a` and `libcassandra.so`) are in your `/usr/local/lib64/` directory
 
+### Floki
+
+Alternatively you can use the [Floki](https://github.com/Metaswitch/floki) utility to create you a Dockerized compilation environment. After installing Floki, just type
+
+```
+floki
+```
+
+in the root of this project. You will be dropped into a Rust compilation environment; type `cargo build` as normal to build the driver.
 
 ## Documentation
 
@@ -61,6 +72,11 @@ The API changed significantly in version 0.10.
 (Version 0.9 was skipped, for consistency with the `cassandra-cpp-sys` version number.)
 For a summary of the main changes, see [`CHANGELOG`](CHANGELOG.md#0100).
 
+## Feature flags
+
+This crate includes the feature flag `early_access_min_tls_version`, which allows you to build against a version of the DataStax driver including the `cass_ssl_set_min_protocol_version` method, as defined in [this PR](https://github.com/datastax/cpp-driver/pull/525). You must have a version of the driver supporting this installed locally to be able to compile (and run) with this feature flag.
+
+When this this feature is available in the mainline driver this flag will be set to do nothing and deprecated, and the functions will be added to the main library. The flag will then be retired in the next breaking change.
 
 ## License
 

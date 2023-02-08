@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](http://semver.org/). The
 version number is tracked in the file `VERSION`.
 
 ## [Unreleased]
+### Fixed
+- The main development branch is now `main` not `master`. To track this, fetch and then check out `main`.
+
+## [1.2.0] - 2022-11-14
+### Added
+- Added `unset_logger`, `set_slog_logger` (behind `slog` feature) and `set_log_logger` (behind `log` feature)
+- Expose `set_resolve_timeout` function.
+- Expose `set_exponential_reconnect` function.
+
+### Changed
+- `set_logger` is deprecated and behind `slog` feature which is enabled by default
+
+### Fixed
+- Inet::Default now returns an ipv4 address of 0.0.0.0 instead of the previous value which was semantically incorrect.
+
+## [1.1.0] - 2022-03-31
+### Added
+- Added new `early_access_min_tls_version` feature, which enables a `set_min_protocol_version` method on an `Ssl` object.
+
+## [1.0.0] - 2022-03-29
+### Added
+- Added new `set_cloud_secure_connection_bundle` and `set_cloud_secure_connection_bundle_no_ssl_lib_init`
+  functions using the functions Datastax defined in
+  cassandra-cpp-driver version 2.16.0.
+- Added new error codes `LIB_NO_TRACING_ID` and `SSL_CLOSED`
+  using the codes Datastax defined in
+  cassandra-cpp-driver version 2.16.0.
+
+## [0.17.2] - 2022-03-09
+### Fixed
+- Fixed UB in `Inet::to_string`
+
+## [0.17.1] - 2022-01-24
+### Changed
+- Move GitHub build to GitHub Actions (was previously Travis).
+
+### Fixed
+- Removed unused `decimal` dependency.
+
+## [0.17.0] - 2021-05-17
+### Changed
+- Changed `Session::execute_batch` and `Session::execute_batch_with_payloads` to take only
+  a reference to `Batch` rather than consuming it.
+
+  This is a breaking change; to update your code, simply change `batch` to `&batch`
+  in your argument list. If this causes an error `future cannot be sent between threads safely`
+  because `&Batch` is `used across an await`, you need to introduce a `let` before the `await`
+  as follows:
+  ```rust
+  let fut = session.execute_batch(&batch);
+  let result = fut.await?
+  ```
+
+## [0.16.0] - 2021-03-10
 ### Added
 - Exposes separate setters for collection types on `Tuple` and `UserType`. As such, the respective
   `set_collection` and `set_collection_by_name` on both types have been removed. `set_collection`
@@ -14,16 +68,26 @@ version number is tracked in the file `VERSION`.
  - Added `Cluster::set_token_aware_routing_shuffle_replicas`.
 - `ConstDataType::new_user_type` has been added, to allow the creation of a user data type
   from an existing data type.
+- Added `Session::execute_with_payloads` and `Session::execute_batch_with_payloads` to allow getting
+  custom payloads from query and batch executions.
 
-### Changed
-- Change various functions to avoid the extra overhead using an intermidiate
-  CString object.
+### Breaking changes
 - Extended the lifetime of a `CassResult` into a `Row`. This is a breaking
   change, and may require reworking the code to satisfy the lifetime
   requirement that the `CassResult` must live longer than the `Row`.
+- `CassCollection::new` has been renamed to `CassCollection::with_capacity`, and `CassCollection::new` has
+  been created, that no longer requires a capacity. This closely mirrors the API that the standard library
+  collections expose, and that the `item_count` passed to `new` is merely a capacity hint for the purpose of
+  optimization.
+- `time::Duration` has been replaced with `std::time::Duration`.
+
+### Changed
+- Change various functions to avoid the extra overhead using an intermediate
+  CString object.
 - Switched to using `parking_lot::Mutex` instead of `std::sync::Mutex` for
   `CassFuture` coordination.
 - Implemented `size_hint` on `ResultIterator`.
+- Bumped versions of various dependencies.
 
 ### Fixed
  - `CassResult::set_paging_state_token` was implemented incorrectly, namely, it did nothing,
@@ -192,7 +256,14 @@ First release of https://github.com/Metaswitch/cassandra-rs
 ## [0.8.1] - 2016-12-13
 Last release of https://github.com/tupshin/cassandra-rs
 
-[Unreleased]: https://github.com/Metaswitch/cassandra-rs/compare/0.15.1...HEAD
+[Unreleased]: https://github.com/Metaswitch/cassandra-rs/compare/1.2.0...HEAD
+[1.2.0]: https://github.com/Metaswitch/cassandra-rs/compare/1.1.0...1.2.0
+[1.1.0]: https://github.com/Metaswitch/cassandra-rs/compare/1.0.0...1.1.0
+[1.0.0]: https://github.com/Metaswitch/cassandra-rs/compare/0.17.2...1.0.0
+[0.17.2]: https://github.com/Metaswitch/cassandra-rs/compare/0.17.1...0.17.2
+[0.17.1]: https://github.com/Metaswitch/cassandra-rs/compare/0.17.0...0.17.1
+[0.17.0]: https://github.com/Metaswitch/cassandra-rs/compare/0.16.0...0.17.0
+[0.16.0]: https://github.com/Metaswitch/cassandra-rs/compare/0.15.1...0.16.0
 [0.15.1]: https://github.com/Metaswitch/cassandra-rs/compare/0.15.0...0.15.1
 [0.15.0]: https://github.com/Metaswitch/cassandra-rs/compare/0.14.0...0.15.0
 [0.14.0]: https://github.com/Metaswitch/cassandra-rs/compare/0.13.2...0.14.0

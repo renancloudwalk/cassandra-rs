@@ -186,6 +186,7 @@ pub(crate) unsafe fn get_cass_future_error(rc: CassError_, inner: *mut _Future) 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[allow(missing_docs)] // Meanings are defined in CQL documentation.
 #[allow(non_camel_case_types)] // Names are traditional.
+#[non_exhaustive]
 pub enum CassErrorCode {
     // deliberately omits CASS_OK
     LIB_BAD_PARAMS,
@@ -222,6 +223,7 @@ pub enum CassErrorCode {
     LIB_INVALID_STATE,
     LIB_NO_CUSTOM_PAYLOAD,
     LIB_EXECUTION_PROFILE_INVALID,
+    LIB_NO_TRACING_ID,
     SERVER_SERVER_ERROR,
     SERVER_PROTOCOL_ERROR,
     SERVER_BAD_CREDENTIALS,
@@ -246,6 +248,7 @@ pub enum CassErrorCode {
     SSL_INVALID_PEER_CERT,
     SSL_IDENTITY_MISMATCH,
     SSL_PROTOCOL_ERROR,
+    SSL_CLOSED,
     // deliberately omits LAST_ENTRY
 }
 
@@ -284,6 +287,7 @@ enhance_nullary_enum!(CassErrorCode, CassError_, {
     (LIB_INVALID_STATE, CASS_ERROR_LIB_INVALID_STATE, "LIB_INVALID_STATE"),
     (LIB_NO_CUSTOM_PAYLOAD, CASS_ERROR_LIB_NO_CUSTOM_PAYLOAD, "LIB_NO_CUSTOM_PAYLOAD"),
     (LIB_EXECUTION_PROFILE_INVALID, CASS_ERROR_LIB_EXECUTION_PROFILE_INVALID, "LIB_EXECUTION_PROFILE_INVALID"),
+    (LIB_NO_TRACING_ID, CASS_ERROR_LIB_NO_TRACING_ID, "LIB_NO_TRACING_ID"),
     (SERVER_SERVER_ERROR, CASS_ERROR_SERVER_SERVER_ERROR, "SERVER_SERVER_ERROR"),
     (SERVER_PROTOCOL_ERROR, CASS_ERROR_SERVER_PROTOCOL_ERROR, "SERVER_PROTOCOL_ERROR"),
     (SERVER_BAD_CREDENTIALS, CASS_ERROR_SERVER_BAD_CREDENTIALS, "SERVER_BAD_CREDENTIALS"),
@@ -308,6 +312,7 @@ enhance_nullary_enum!(CassErrorCode, CassError_, {
     (SSL_INVALID_PEER_CERT, CASS_ERROR_SSL_INVALID_PEER_CERT, "SSL_INVALID_PEER_CERT"),
     (SSL_IDENTITY_MISMATCH, CASS_ERROR_SSL_IDENTITY_MISMATCH, "SSL_IDENTITY_MISMATCH"),
     (SSL_PROTOCOL_ERROR, CASS_ERROR_SSL_PROTOCOL_ERROR, "SSL_PROTOCOL_ERROR"),
+    (SSL_CLOSED, CASS_ERROR_SSL_CLOSED, "SSL_CLOSED"),
 }, omit { CASS_OK, CASS_ERROR_LAST_ENTRY });
 
 /// Extract an optional C string lossily (i.e., using a replacement char for non-UTF-8 sequences).
@@ -315,13 +320,13 @@ pub(crate) unsafe fn get_lossy_string<F>(get: F) -> Option<String>
 where
     F: Fn(*mut *const ::std::os::raw::c_char, *mut usize) -> CassError_,
 {
-    let mut msg = mem::zeroed();
-    let mut msg_len = mem::zeroed();
+    let mut msg = std::ptr::null();
+    let mut msg_len = 0;
     match (get)(&mut msg, &mut msg_len) {
         CASS_OK => (),
         _ => return None,
     }
-    let slice = slice::from_raw_parts(msg as *const u8, msg_len as usize);
+    let slice = slice::from_raw_parts(msg as *const u8, msg_len);
     Some(String::from_utf8_lossy(slice).into_owned())
 }
 
