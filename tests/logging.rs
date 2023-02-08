@@ -33,8 +33,9 @@ impl Drain for MyDrain {
     }
 }
 
+#[cfg(feature = "slog")]
 #[tokio::test]
-async fn test_logging() {
+async fn test_slog_logger() {
     let drain = MyDrain::default();
     let logger = Logger::root(drain.clone().fuse(), o!());
 
@@ -52,6 +53,34 @@ async fn test_logging() {
         log_output.contains("Unable to resolve address for absolute-gibberish.invalid"),
         log_output
     );
+}
+
+#[cfg(feature = "log")]
+#[test]
+fn test_log_logger() {
+    use log::Level;
+
+    let mut logger = logtest::Logger::start();
+    set_level(LogLevel::WARN);
+    set_log_logger();
+
+    let mut cluster = Cluster::default();
+    cluster
+        .set_contact_points("absolute-gibberish.invalid")
+        .unwrap();
+    cluster.connect().expect_err("Should fail to connect");
+
+    let record = logger.pop().unwrap();
+    assert_eq!(
+        record.args(),
+        "Unable to resolve address for absolute-gibberish.invalid:9042\n",
+    );
+    assert_eq!(record.level(), Level::Error);
+    assert_eq!(
+        record.target(),
+        "{anonymous}::DefaultClusterMetadataResolver::on_resolve"
+    );
+    assert_eq!(record.key_values(), vec!());
 }
 
 #[tokio::test]
