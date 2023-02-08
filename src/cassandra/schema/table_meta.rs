@@ -17,6 +17,7 @@ use crate::cassandra_sys::cass_table_meta_partition_key;
 use crate::cassandra_sys::cass_table_meta_partition_key_count;
 use crate::cassandra_sys::CassTableMeta as _CassTableMeta;
 use std::mem;
+use std::os::raw::c_char;
 use std::slice;
 
 use std::str;
@@ -57,23 +58,20 @@ impl TableMeta {
         unsafe {
             ColumnMeta::build(cass_table_meta_column_by_name(
                 self.0,
-                name.as_ptr() as *const i8,
+                name.as_ptr() as *const c_char,
             ))
         }
     }
 
     /// Gets the name of the table.
     pub fn get_name(&self) -> String {
+        let mut name = std::ptr::null();
+        let mut name_length = 0;
         unsafe {
-            let mut name = mem::zeroed();
-            let mut name_length = mem::zeroed();
             cass_table_meta_name(self.0, &mut name, &mut name_length);
-            str::from_utf8(slice::from_raw_parts(
-                name as *const u8,
-                name_length as usize,
-            ))
-            .expect("must be utf8")
-            .to_owned()
+            str::from_utf8(slice::from_raw_parts(name as *const u8, name_length))
+                .expect("must be utf8")
+                .to_owned()
         }
     }
 
@@ -127,7 +125,7 @@ impl TableMeta {
     pub fn field_by_name(&self, name: &str) -> Option<Value> {
         // fixme replace CassValule with a custom type
         unsafe {
-            let value = cass_table_meta_field_by_name(self.0, name.as_ptr() as *const i8);
+            let value = cass_table_meta_field_by_name(self.0, name.as_ptr() as *const c_char);
             if value.is_null() {
                 None
             } else {

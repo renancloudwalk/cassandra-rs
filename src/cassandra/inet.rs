@@ -50,7 +50,10 @@ impl Protected<_Inet> for Inet {
 
 impl Default for Inet {
     fn default() -> Inet {
-        unsafe { ::std::mem::zeroed() }
+        Inet(_Inet {
+            address: [0; 16],
+            address_length: 4,
+        })
     }
 }
 
@@ -87,10 +90,12 @@ impl FromStr for Inet {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
+        let s_ptr = s.as_ptr() as *const c_char;
+        let mut inet = _Inet {
+            address: [0; 16],
+            address_length: 0,
+        };
         unsafe {
-            let mut inet = mem::zeroed();
-
-            let s_ptr = s.as_ptr() as *const c_char;
             cass_inet_from_string_n(s_ptr, s.len(), &mut inet)
                 .to_result(())
                 .and_then(|_| Ok(Inet(inet)))
@@ -101,9 +106,11 @@ impl FromStr for Inet {
 impl ToString for Inet {
     fn to_string(&self) -> String {
         unsafe {
-            let mut inet_str = mem::zeroed();
-            cass_inet_string(self.0, &mut inet_str);
-            CStr::from_ptr(&inet_str).to_string_lossy().into_owned()
+            let mut inet_str = [0i8; cassandra_cpp_sys::CASS_INET_STRING_LENGTH as usize];
+            cass_inet_string(self.0, inet_str.as_mut_ptr() as *mut libc::c_char);
+            CStr::from_ptr(inet_str.as_ptr() as *const libc::c_char)
+                .to_string_lossy()
+                .into_owned()
         }
     }
 }
@@ -136,4 +143,11 @@ fn ipv6_conversion() {
     let inet = Inet::cass_inet_init_v6(&ipv6_in);
     let ip_out = IpAddr::from(&inet);
     assert_eq!(IpAddr::V6(ipv6_in), ip_out);
+}
+
+#[test]
+fn ipv4_to_string() {
+    let ipv4_in = Ipv4Addr::new(127, 0, 0, 1);
+    let inet = Inet::cass_inet_init_v4(&ipv4_in);
+    assert_eq!("127.0.0.1", inet.to_string());
 }
